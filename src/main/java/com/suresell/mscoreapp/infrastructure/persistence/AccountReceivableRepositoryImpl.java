@@ -126,9 +126,26 @@ public class AccountReceivableRepositoryImpl implements AccountReceivableReposit
         return mapper.toDomain(existingEntity);
     }
 
+    /**
+     * 🔴 El libro de cartera es APPEND-ONLY, y esto lo estaba borrando.
+     *
+     * <p>Se midió en staging (2026-09-05) con un cliente de prueba: deuda de
+     * 30.000 y abono de 20.000. La cuenta decía 10.000; el libro tenía UNA
+     * fila, el abono. Este método hacía {@code deleteByAccountId} y volvía a
+     * escribir los movimientos del objeto en memoria — y el mapper carga la
+     * cuenta con {@code transactions} vacío, así que cada operación borraba
+     * la historia de la anterior. Nunca se notó porque la cartera tenía cero
+     * filas en producción.
+     *
+     * <p>Ahora solo se INSERTAN los movimientos que la operación añadió. Y desde
+     * V44 de la cadena de ventas la base no deja borrar ni editar el libro
+     * aunque alguien vuelva a escribir el {@code delete}.
+     */
     private void updateTransactions(AccountReceivable account) {
-        debtTransactionJpaRepository.deleteByAccountId(account.getId());
         for (DebtTransaction transaction : account.getTransactions()) {
+            if (transaction.getId() != null && debtTransactionJpaRepository.existsById(transaction.getId())) {
+                continue;
+            }
             DebtTransactionEntity transactionEntity = mapper.transactionToEntity(transaction, account.getId());
             debtTransactionJpaRepository.save(transactionEntity);
         }
@@ -137,10 +154,10 @@ public class AccountReceivableRepositoryImpl implements AccountReceivableReposit
     @Override
     @Transactional
     public void deleteById(String id) {
-        logger.debug("Eliminando cuenta: {}", id);
-        debtTransactionJpaRepository.deleteByAccountId(id);
-        accountReceivableJpaRepository.deleteById(id);
-        logger.info("Cuenta {} eliminada", id);
+        // Una cuenta con historia no se borra: se cierra (status CLOSED). El
+        // libro es append-only por privilegio desde V44; borrar fallaría igual.
+        throw new IllegalStateException(
+                "La cartera no se borra: cierra la cuenta. Sus movimientos son historia y se conservan.");
     }
 
     @Override

@@ -92,3 +92,12 @@ logging:
 security:
   jwt:
     secret: ${JWT_SECRET:}
+
+# Ola 4 (A): interruptor del retiro del inventario viejo (supplies, supply-categories,
+# supply-consumptions, shopping-list, supplier-requests, weekly-inventory). Con true,
+# toda escritura a esas rutas responde 410 con el texto de adonde ir; las lecturas
+# siguen. Por defecto false: la app de cocina todavia escribe ahi. Ver
+# ModuloViejoDeInventarioSoloLectura.
+inventario:
+  viejo:
+    solo-lectura: ${INVENTARIO_VIEJO_SOLO_LECTURA:false}

@@ -88,7 +88,12 @@ public class JwtTenantFilter extends OncePerRequestFilter {
 
         String cabecera = req.getHeader("Authorization");
         if (cabecera == null || !cabecera.startsWith("Bearer ")) {
-            res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Falta el token de sesion");
+            // Al cliente, lo justo. Al log, el motivo: fue la lección del 401
+            // que costó diez minutos (2026-07-30, el health check).
+            log.warn("401 en {} {}: {}", req.getMethod(), req.getRequestURI(),
+                    cabecera == null ? "sin cabecera Authorization" : "cabecera sin el prefijo Bearer");
+            rechazar(res, HttpServletResponse.SC_UNAUTHORIZED, "SESION_REQUERIDA",
+                    "Falta el token de sesion. Vuelve a iniciar sesion.");
             return;
         }
 
@@ -104,15 +109,21 @@ public class JwtTenantFilter extends OncePerRequestFilter {
                 tenantId = claims.get("tenantId", String.class);
             }
         } catch (Exception e) {
-            log.debug("Token rechazado: {}", e.getMessage());
-            res.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Sesion invalida o vencida");
+            // Ambiguo para el cliente a propósito (no se le cuenta a un atacante
+            // si fue la firma o la fecha); completo en el log, sin el token.
+            log.warn("401 en {} {}: token rechazado ({}: {})", req.getMethod(), req.getRequestURI(),
+                    e.getClass().getSimpleName(), primeraLinea(e.getMessage()));
+            rechazar(res, HttpServletResponse.SC_UNAUTHORIZED, "SESION_INVALIDA",
+                    "Sesion invalida o vencida. Vuelve a iniciar sesion.");
             return;
         }
 
         if (tenantId == null || tenantId.isBlank()) {
             // Un token sin tenant (super-admin del KAM) no puede leer datos de
             // negocio: no sabriamos de cual.
-            res.sendError(HttpServletResponse.SC_FORBIDDEN, "El token no identifica un negocio");
+            log.warn("403 en {} {}: el token no identifica un negocio", req.getMethod(), req.getRequestURI());
+            rechazar(res, HttpServletResponse.SC_FORBIDDEN, "SIN_NEGOCIO",
+                    "El token no identifica un negocio. Entra con la cuenta del negocio, no con la del KAM.");
             return;
         }
 
@@ -124,5 +135,26 @@ public class JwtTenantFilter extends OncePerRequestFilter {
             // tenant al siguiente request.
             TenantContext.clear();
         }
+    }
+
+    /**
+     * Responde en JSON con el mismo formato que {@code TraductorDeErrores}
+     * ({@code error} + {@code mensaje}). Antes era {@code sendError}, que en un
+     * filtro produce la página de error de Spring sin mensaje: el panel veía un
+     * 401 mudo y no podía distinguir «no hay sesión» de «venció».
+     */
+    private static void rechazar(HttpServletResponse res, int estado, String codigo, String mensaje)
+            throws java.io.IOException {
+        res.setStatus(estado);
+        res.setContentType("application/json;charset=UTF-8");
+        res.getWriter().write("{\"error\":\"" + codigo + "\",\"mensaje\":\"" + mensaje + "\"}");
+    }
+
+    private static String primeraLinea(String m) {
+        if (m == null) {
+            return "";
+        }
+        int corte = m.indexOf('\n');
+        return (corte < 0 ? m : m.substring(0, corte)).trim();
     }
 }

@@ -46,9 +46,21 @@ class ModuloViejoDeInventarioSoloLecturaTest {
         var interceptor = new ModuloViejoDeInventarioSoloLectura(true);
         MockHttpServletResponse res = new MockHttpServletResponse();
 
-        assertThat(interceptor.preHandle(peticion("POST", "/api/weekly-inventory"), res, new Object())).isFalse();
+        assertThat(interceptor.preHandle(peticion("POST", "/api/supply-consumptions"), res, new Object())).isFalse();
         assertThat(res.getStatus()).isEqualTo(410);
         assertThat(res.getContentAsString()).contains("MODULO_RETIRADO").contains("Insumos y Compras");
+    }
+
+    @Test
+    @DisplayName("encendido: lo que la cocina escribe (inventario semanal, pedidos, lista) sigue abierto")
+    void encendidoNoCierraLoQueLaCocinaEscribe() throws Exception {
+        var interceptor = new ModuloViejoDeInventarioSoloLectura(true);
+
+        for (String ruta : ModuloViejoDeInventarioSoloLectura.RUTAS_QUE_LA_COCINA_ESCRIBE) {
+            MockHttpServletResponse res = new MockHttpServletResponse();
+            assertThat(interceptor.preHandle(peticion("POST", ruta), res, new Object())).as(ruta).isTrue();
+            assertThat(res.getStatus()).as(ruta).isEqualTo(200);
+        }
     }
 
     @Test

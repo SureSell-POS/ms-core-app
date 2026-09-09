@@ -59,14 +59,28 @@ public class ModuloViejoDeInventarioSoloLectura implements WebMvcConfigurer, Han
 
     private static final Logger log = LoggerFactory.getLogger(ModuloViejoDeInventarioSoloLectura.class);
 
-    /** Rutas (sin el context path {@code /api/core}) del módulo viejo. */
+    /**
+     * Rutas (sin el context path {@code /api/core}) del módulo viejo que se
+     * cierran a escritura con el interruptor.
+     *
+     * <p><b>No están</b> {@code /api/weekly-inventory}, {@code /api/supplier-requests}
+     * ni {@code /api/shopping-list}: son las tres que la app de cocina escribe y
+     * que el módulo nuevo no tiene (decisión de Santiago, 2026-09-09: llevarlas
+     * al nuevo es grande —proveedores, pedidos con estado, mínimo por insumo y
+     * lista generada— y no cabe en esta ola; ver
+     * {@code docs/inventario/RETIRO-INVENTARIO-VIEJO.md} §4). Siguen abiertas
+     * hasta que el nuevo las cubra. Lo demás del módulo viejo se cierra.
+     */
     static final List<String> RUTAS_VIEJAS = List.of(
             "/api/supplies",
             "/api/supply-categories",
-            "/api/supply-consumptions",
-            "/api/shopping-list",
+            "/api/supply-consumptions");
+
+    /** Lo que la cocina todavía escribe. Se deja pasar a propósito; ver arriba. */
+    static final List<String> RUTAS_QUE_LA_COCINA_ESCRIBE = List.of(
+            "/api/weekly-inventory",
             "/api/supplier-requests",
-            "/api/weekly-inventory");
+            "/api/shopping-list");
 
     static final String MENSAJE =
             "Este módulo de inventario se retiró. Los insumos, las compras y el stock se llevan ahora en "

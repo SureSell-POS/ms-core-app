@@ -171,8 +171,13 @@ public class TraductorDeErrores {
         }
         if (CLAVE_DUPLICADA.equals(sqlState)) {
             log.warn("Clave duplicada: {}", detalle);
+            // Sin «en este negocio»: las claves de menu_categories y
+            // menu_products son globales (V2), así que el identificador puede
+            // ser de OTRO negocio, y bajo RLS este no lo ve. Decirle que ya lo
+            // tiene sería mentira (revisión manual, 2026-09-09).
             return respuesta(HttpStatus.CONFLICT, "YA_EXISTE",
-                    "Ya existe un registro con ese identificador o nombre en este negocio.");
+                    "Ese identificador ya está en uso (puede que en otro negocio). Elige otro; "
+                    + "el panel pone el nombre del negocio delante para evitarlo.");
         }
         if (REFERENCIA_INEXISTENTE.equals(sqlState)) {
             log.warn("Referencia inexistente: {}", detalle);

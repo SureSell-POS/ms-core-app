@@ -107,6 +107,18 @@ public class TraductorDeErrores {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(m);
     }
 
+    /** Una regla del negocio con código y campo: 422, y el panel la pinta junto al input. */
+    @ExceptionHandler(com.suresell.mscoreapp.shared.exception.ReglaDeNegocioException.class)
+    public ResponseEntity<Map<String, Object>> reglaDeNegocio(
+            com.suresell.mscoreapp.shared.exception.ReglaDeNegocioException e) {
+        log.info("Regla de negocio ({}): {}", e.codigo(), e.getMessage());
+        Map<String, Object> m = cuerpo(e.codigo(), e.getMessage());
+        if (e.campo() != null) {
+            m.put("campo", e.campo());
+        }
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(m);
+    }
+
     @ExceptionHandler(SupplyNotFoundException.class)
     public ResponseEntity<Map<String, Object>> noEncontrado(SupplyNotFoundException e) {
         log.info("No encontrado: {}", e.getMessage());

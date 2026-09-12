@@ -25,9 +25,23 @@ public class OrderEditHistoryEntity extends EntidadDeNegocio {
     @Column(name = "order_id", nullable = false)
     private Long orderId;
 
-    @Enumerated(EnumType.STRING)
+    /**
+     * Tipo de cambio, TAL CUAL está en la base y sin convertir a enum.
+     *
+     * <p>Hasta el 2026-09-12 esto era un {@code @Enumerated(EnumType.STRING)} sobre
+     * {@link OrderEditType}, que solo conocía tres valores. En cuanto
+     * ms-order-product escribió {@code DISCOUNT_APPLIED} (V57), Hibernate no pudo
+     * convertir esa fila y la consulta entera fallaba: la pantalla de historial se
+     * caía para TODAS las filas del negocio, incluidas las que sí entendía. Esta
+     * tabla la escribe otro servicio, así que aquí se lee como texto y ningún valor
+     * nuevo puede volver a tumbar la lectura.
+     */
     @Column(name = "edit_type")
-    private OrderEditType editType;
+    private String editType;
+
+    /** Cupón aplicado, cuando el cambio fue un descuento (ms-order-product, V57). */
+    @Column(name = "discount_code")
+    private String discountCode;
 
     @Column(name = "product_id")
     private String productId;

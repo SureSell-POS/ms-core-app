@@ -1,6 +1,5 @@
 package com.suresell.mscoreapp.application.dto;
 
-import com.suresell.mscoreapp.shared.enums.OrderEditType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,12 +13,14 @@ import java.time.LocalDateTime;
 public class OrderEditHistoryDto {
     private Long id;
     private Long orderId;
-    private OrderEditType editType;
+    /** Texto tal cual de la base: quien lo escribe es otro servicio. */
+    private String editType;
     private String productId;
     private String productName;
     private Integer oldQuantity;
     private Integer newQuantity;
     private BigDecimal oldTotal;
     private BigDecimal newTotal;
+    private String discountCode;
     private LocalDateTime editedAt;
 }

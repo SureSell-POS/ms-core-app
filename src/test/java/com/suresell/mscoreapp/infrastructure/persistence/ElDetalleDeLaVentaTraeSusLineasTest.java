@@ -165,7 +165,85 @@ class ElDetalleDeLaVentaTraeSusLineasTest {
                 .as("la MISMA venta con id_order_item vacío").hasSize(1);
     }
 
+    /**
+     * ⏸️ EL MISMO DEFECTO, EN LA TABLA DE AL LADO — MEDIDO, NO ARREGLADO.
+     *
+     * <p>Medido el 2026-09-13 con este mismo método: dos ventas idénticas salvo
+     * en {@code order_delivery_tracking.order_id}. La del POS (columna escrita)
+     * encuentra su seguimiento; la de la nube (columna vacía) lo pierde, porque
+     * este servicio busca esa fila por {@code order_id}
+     * ({@code OrderDeliveryTracking.java:13-15}) cuando la clave real es
+     * {@code order_id_uuid} ({@code V2__multitenant_remaining_tables.sql:12}) y
+     * el camino de la nube no escribe {@code order_id}
+     * ({@code PostgresOrderCloudSyncAdapter.upsertDeliveryTracking}).
+     *
+     * <p><b>Por qué se queda apagada en vez de arreglarse.</b> Porque hoy no lo
+     * lee nadie a través de este servicio: {@code OrderResponse} no lleva
+     * {@code delivered} ni {@code preparationDurationSeconds}, y
+     * {@code grep -rn OrderDeliveryTracking src/main/java} solo devuelve la
+     * entidad y el campo de {@code Order}. El POS sí muestra «T. Prep», pero lo
+     * pide a {@code ms-order-product-mt} ({@code /orders/historial}), que mapea
+     * esta misma tabla BIEN —su {@code @Id} está en {@code order_id_uuid}—, así
+     * que no le afecta.
+     *
+     * <p><b>Cuándo hay que encenderla:</b> el día que {@code OrderResponse}
+     * empiece a llevar «Entregado» o «Tiempo de preparación» al panel. Ese día
+     * esta prueba se pone roja sola y dice qué arreglar. El arreglo no es de una
+     * línea como el de {@code OrderItem}: hay que mover el {@code @Id} a
+     * {@code order_id_uuid} y rehacer el {@code @MapsId}, que hoy cuelga de
+     * {@code order_id} contra {@code Order.id_order}.
+     */
+    @Test
+    @org.junit.jupiter.api.Disabled("Medido y real, pero hoy ningún consumidor lo lee a través del core. "
+            + "Encender cuando OrderResponse exponga «Entregado» o «T. Prep» al panel.")
+    @DisplayName("⏸️ el cabo hermano: el seguimiento de entrega de una venta de la nube (`order_id` vacío) se pierde")
+    void elSeguimientoDeEntregaDeLaNube() {
+        // Tal como lo escribe la nube: `PostgresOrderCloudSyncAdapter.upsertDeliveryTracking`
+        // pone `order_id_uuid`, `delivered`, `pager_returned` y los segundos —
+        // pero NO `order_id`, que es por donde lo busca este servicio
+        // (`OrderDeliveryTracking.java:13-15`, @Id sobre `order_id`).
+        UUID deLaNube = UUID.randomUUID();
+        crearVenta(17, deLaNube, new BigDecimal("30000"));
+        crearSeguimiento(deLaNube, null, true, 420);
+
+        // Y tal como lo escribe el POS por JPA (`OrderHandler.java:339-340`,
+        // `909-918`): ahí sí se asigna `order_id`.
+        UUID delPos = UUID.randomUUID();
+        crearVenta(18, delPos, new BigDecimal("30000"));
+        crearSeguimiento(delPos, 18L, true, 420);
+
+        assertThat(contarSeguimientosEnLaBase()).as("las dos filas están en la base").isEqualTo(2);
+
+        assertThat(laVentaEnCrudo(18).getDeliveryTracking())
+                .as("venta del POS: el seguimiento se encuentra")
+                .isNotNull();
+        assertThat(laVentaEnCrudo(17).getDeliveryTracking())
+                .as("venta de la nube: si esto es null, «Entregado» y «T. Prep» se pierden igual "
+                        + "que se perdían las líneas")
+                .isNotNull();
+    }
+
     // ---------------------------------------------------------------- apoyo
+
+    /** La orden como entidad, para mirar lo que el DTO del listado no lleva. */
+    private com.suresell.mscoreapp.domain.model.Order laVentaEnCrudo(long numeroDeOrden) {
+        return new TransactionTemplate(gestorDeTransacciones)
+                .execute(estado -> ordenes.findById(numeroDeOrden).orElseThrow());
+    }
+
+    private Integer contarSeguimientosEnLaBase() {
+        return jdbc.queryForObject(
+                "SELECT count(*) FROM order_delivery_tracking WHERE tenant_id = ?",
+                Integer.class, NEGOCIO);
+    }
+
+    private void crearSeguimiento(UUID ordenUuid, Long orderId, boolean entregado, Integer segundos) {
+        jdbc.update("""
+                INSERT INTO order_delivery_tracking (order_id_uuid, tenant_id, order_id,
+                                                     delivered, pager_returned, preparation_duration_seconds)
+                VALUES (?, ?, ?, ?, false, ?)
+                """, ordenUuid, NEGOCIO, orderId, entregado, segundos);
+    }
 
     /**
      * El listado real de {@code GET /api/orders}, filtrado por número de orden:

@@ -134,6 +134,16 @@ public class TraductorDeErrores {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(m);
     }
 
+    /** 410: el módulo se mudó a otro servicio (F4.6, cartera). Se dice a dónde, no se escribe nada. */
+    @ExceptionHandler(com.suresell.mscoreapp.shared.exception.ModuloRetiradoException.class)
+    public ResponseEntity<Map<String, Object>> moduloRetirado(
+            com.suresell.mscoreapp.shared.exception.ModuloRetiradoException e) {
+        log.info("410 {}: {}", com.suresell.mscoreapp.shared.exception.ModuloRetiradoException.CODIGO, e.getMessage());
+        Map<String, Object> m = cuerpo(com.suresell.mscoreapp.shared.exception.ModuloRetiradoException.CODIGO, e.getMessage());
+        m.put("message", e.getMessage());
+        return ResponseEntity.status(HttpStatus.GONE).body(m);
+    }
+
     @ExceptionHandler(SupplyNotFoundException.class)
     public ResponseEntity<Map<String, Object>> noEncontrado(SupplyNotFoundException e) {
         log.info("No encontrado: {}", e.getMessage());

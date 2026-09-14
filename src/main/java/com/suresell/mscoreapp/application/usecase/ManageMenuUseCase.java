@@ -63,6 +63,8 @@ public class ManageMenuUseCase {
         MenuCategoryEntity category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new IllegalArgumentException("Categoría no encontrada: " + request.getCategoryId()));
 
+        exigirPrecioParaActivar(request.getName(), request.getPrice(), Boolean.TRUE.equals(request.getActive()));
+
         MenuProductEntity entity = new MenuProductEntity();
         entity.setId(request.getId());
         entity.setName(request.getName());
@@ -73,10 +75,25 @@ public class ManageMenuUseCase {
         return productMapper.toDto(productRepository.save(entity));
     }
 
+    /**
+     * Un producto sin precio no se vende: se activa cuando lo tenga. Nació con
+     * la precarga (ola 4): los precargados nacen a $0 e inactivos, y el botón
+     * «Activar» los dejaba vender a $0. Vale también para el que se crea a mano.
+     */
+    static void exigirPrecioParaActivar(String nombre, Integer precio, boolean activar) {
+        if (activar && (precio == null || precio <= 0)) {
+            throw new com.suresell.mscoreapp.shared.exception.ReglaDeNegocioException(
+                    "SIN_PRECIO", "price",
+                    "«" + nombre + "» no tiene precio: ponle precio antes de activarlo, "
+                    + "o se vendería a $0.");
+        }
+    }
+
     @Transactional
     public MenuProductDto updateProductStatus(String id, boolean active) {
         MenuProductEntity entity = productRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Producto no encontrado: " + id));
+        exigirPrecioParaActivar(entity.getName(), entity.getPrice(), active);
         entity.setActive(active);
         return productMapper.toDto(productRepository.save(entity));
     }
